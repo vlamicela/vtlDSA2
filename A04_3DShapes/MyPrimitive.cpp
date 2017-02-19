@@ -30,6 +30,11 @@ void MyPrimitive::AddQuad(vector3 a_vBottomLeft, vector3 a_vBottomRight, vector3
 	AddVertexPosition(a_vBottomRight);
 	AddVertexPosition(a_vTopRight);
 }
+void MyPrimitive::AddTri(vector3 a_vBottomLeft, vector3 a_vBottomRight, vector3 a_vTop) {
+	AddVertexPosition(a_vBottomLeft);
+	AddVertexPosition(a_vBottomRight);
+	AddVertexPosition(a_vTop);
+}
 void MyPrimitive::GeneratePlane(float a_fSize, vector3 a_v3Color)
 {
 	if (a_fSize < 0.01f)
@@ -110,16 +115,32 @@ void MyPrimitive::GenerateCone(float a_fRadius, float a_fHeight, int a_nSubdivis
 	Init();
 
 	//Your code starts here
-	float fValue = 0.5f;
-	//3--2
-	//|  |
-	//0--1
-	vector3 point0(-fValue, -fValue, fValue); //0
-	vector3 point1(fValue, -fValue, fValue); //1
-	vector3 point2(fValue, fValue, fValue); //2
-	vector3 point3(-fValue, fValue, fValue); //3
+	
+	//one point for the top
+	vector3 top(0, 0, -a_fHeight);
+	//circle of points for the base
+	std::vector<vector3> base;
+	vector3 baseCenter(0, 0, a_fHeight);
+	float angle = 0;
+	float increment = 360 / a_nSubdivisions;
+	for (int x = 0; x < a_nSubdivisions; x++) {
+		//create a point and add it to the list
+		//cos of angle
+		vector3 point(cos(glm::radians(angle)) * a_fRadius, sin(glm::radians(angle)) * a_fRadius, a_fHeight);
+		base.push_back(point);
+		//increment angle
+		angle += increment;
+	}
 
-	AddQuad(point0, point1, point3, point2);
+	//Create tris from point, point+1, top
+	for (int t = 0; t < a_nSubdivisions - 1; t++) {
+		AddTri(base[t+1], base[t], top);
+	}
+	AddTri(base[0], base[a_nSubdivisions - 1], top);
+	for (int b = 0; b < a_nSubdivisions - 1; b++) {
+		AddTri(base[b], base[b+1], baseCenter);
+	}
+	AddTri(base[a_nSubdivisions - 1], base[0], baseCenter);
 
 	//Your code ends here
 	CompileObject(a_v3Color);
@@ -135,17 +156,40 @@ void MyPrimitive::GenerateCylinder(float a_fRadius, float a_fHeight, int a_nSubd
 	Init();
 
 	//Your code starts here
-	float fValue = 0.5f;
+	
+	//make a ring of points for the base and the top
+	std::vector<vector3> base;
+	vector3 baseCenter(0, 0, -a_fHeight);
+	std::vector<vector3> top;
+	vector3 topCenter(0, 0, a_fHeight);
+	float angle = 0;
+	float increment = 360 / a_nSubdivisions;
+	for (int x = 0; x < a_nSubdivisions; x++) {
+		//create points for ends and add them to corresponding lists
+		vector3 basePoint(cos(glm::radians(angle)) * a_fRadius, sin(glm::radians(angle)) * a_fRadius, -a_fHeight);
+		vector3 topPoint(cos(glm::radians(angle)) * a_fRadius, sin(glm::radians(angle)) * a_fRadius, a_fHeight);
+		base.push_back(basePoint);
+		top.push_back(topPoint);
+		angle += increment;
+	}
+
+	//create quads from endpoints
 	//3--2
 	//|  |
 	//0--1
-	vector3 point0(-fValue, -fValue, fValue); //0
-	vector3 point1(fValue, -fValue, fValue); //1
-	vector3 point2(fValue, fValue, fValue); //2
-	vector3 point3(-fValue, fValue, fValue); //3
-
-	AddQuad(point0, point1, point3, point2);
-
+	for (int c = 0; c < a_nSubdivisions - 1; c++) {
+		AddQuad(base[c], base[c + 1], top[c], top[c + 1]);
+	}
+	AddQuad(base[a_nSubdivisions - 1], base[0], top[a_nSubdivisions - 1], top[0]);
+	//fill in ends with tris
+	for (int t = 0; t < a_nSubdivisions - 1; t++) {
+		AddTri(top[t], top[t+1], topCenter);
+	}
+	AddTri(top[a_nSubdivisions - 1], top[0], topCenter);
+	for (int b = 0; b < a_nSubdivisions - 1; b++) {
+		AddTri(base[b + 1], base[b], baseCenter);
+	}
+	AddTri(base[0], base[a_nSubdivisions - 1], baseCenter);
 	//Your code ends here
 	CompileObject(a_v3Color);
 }
@@ -160,17 +204,68 @@ void MyPrimitive::GenerateTube(float a_fOuterRadius, float a_fInnerRadius, float
 	Init();
 
 	//Your code starts here
-	float fValue = 0.5f;
-	//3--2
-	//|  |
-	//0--1
-	vector3 point0(-fValue, -fValue, fValue); //0
-	vector3 point1(fValue, -fValue, fValue); //1
-	vector3 point2(fValue, fValue, fValue); //2
-	vector3 point3(-fValue, fValue, fValue); //3
+	
+	//make 2 rings of points for base and top
+	std::vector<vector3> baseOut;
+	std::vector<vector3> topOut;
+	std::vector<vector3> baseIn;
+	std::vector<vector3> topIn;
+	float angle = 0;
+	float increment = 360 / a_nSubdivisions;
+	//generate points
+	//base outer
+	for (int b = 0; b < a_nSubdivisions; b++) {
+		vector3 bPoint(cos(glm::radians(angle)) * a_fOuterRadius, sin(glm::radians(angle)) * a_fOuterRadius, -a_fHeight);
+		baseOut.push_back(bPoint);
+		angle += increment;
+	}
+	angle = 0;
+	//base inner
+	for (int bi = 0; bi < a_nSubdivisions; bi++) {
+		vector3 biPoint(cos(glm::radians(angle)) * a_fInnerRadius, sin(glm::radians(angle)) * a_fInnerRadius, -a_fHeight);
+		baseIn.push_back(biPoint);
+		angle += increment;
+	}
+	angle = 0;
+	//top outer
+	for (int t = 0; t < a_nSubdivisions; t++) {
+		vector3 tPoint(cos(glm::radians(angle)) * a_fOuterRadius, sin(glm::radians(angle)) * a_fOuterRadius, a_fHeight);
+		topOut.push_back(tPoint);
+		angle += increment;
+	}
+	angle = 0;
+	//top inner
+	for (int ti = 0; ti < a_nSubdivisions; ti++) {
+		vector3 tiPoint(cos(glm::radians(angle)) * a_fInnerRadius, sin(glm::radians(angle)) * a_fInnerRadius, a_fHeight);
+		topIn.push_back(tiPoint);
+		angle += increment;
+	}
 
-	AddQuad(point0, point1, point3, point2);
-
+	//create quads
+	//2---3		3---2 
+	//| \ |		| \ | inner
+	//0---1		1---0
+	//outer surface
+	for (int o = 0; o < a_nSubdivisions - 1; o++) {
+		AddQuad(baseOut[o], baseOut[o+1], topOut[o], topOut[o+1]);
+	}
+	AddQuad(baseOut[a_nSubdivisions - 1], baseOut[0], topOut[a_nSubdivisions - 1], topOut[0]);
+	//inner surface
+	for (int i = 0; i < a_nSubdivisions - 1; i++) {
+		AddQuad(baseIn[i+1], baseIn[i], topIn[i+1], topIn[i]);
+	}
+	AddQuad(baseIn[0], baseIn[a_nSubdivisions - 1], topIn[0], topIn[a_nSubdivisions - 1]);
+	//connect surfaces
+	//top surface
+	for (int c = 0; c < a_nSubdivisions - 1; c++) {
+		AddQuad(topOut[c], topOut[c+1], topIn[c], topIn[c+1]);
+	}
+	AddQuad(topOut[a_nSubdivisions - 1], topOut[0], topIn[a_nSubdivisions - 1], topIn[0]);
+	//bottom text
+	for (int cb = 0; cb < a_nSubdivisions - 1; cb++) {
+		AddQuad(baseOut[cb+1], baseOut[cb], baseIn[cb+1], baseIn[cb]);
+	}
+	AddQuad(baseOut[0], baseOut[a_nSubdivisions - 1], baseIn[0], baseIn[a_nSubdivisions - 1]);
 	//Your code ends here
 	CompileObject(a_v3Color);
 }
@@ -193,16 +288,12 @@ void MyPrimitive::GenerateTorus(float a_fOuterRadius, float a_fInnerRadius, int 
 	Init();
 
 	//Your code starts here
-	float fValue = 0.5f;
-	//3--2
-	//|  |
-	//0--1
-	vector3 point0(-fValue, -fValue, fValue); //0
-	vector3 point1(fValue, -fValue, fValue); //1
-	vector3 point2(fValue, fValue, fValue); //2
-	vector3 point3(-fValue, fValue, fValue); //3
-
-	AddQuad(point0, point1, point3, point2);
+	
+	//make two rings of points for the midsection
+	std::vector<vector3> midOuter;
+	std::vector<vector3> midInner;
+	//make a ring of points for the top and bottom
+	//use trig to generate smoothing rings
 
 	//Your code ends here
 	CompileObject(a_v3Color);
@@ -222,16 +313,24 @@ void MyPrimitive::GenerateSphere(float a_fRadius, int a_nSubdivisions, vector3 a
 	Init();
 
 	//Your code starts here
-	float fValue = 0.5f;
-	//3--2
-	//|  |
-	//0--1
-	vector3 point0(-fValue, -fValue, fValue); //0
-	vector3 point1(fValue, -fValue, fValue); //1
-	vector3 point2(fValue, fValue, fValue); //2
-	vector3 point3(-fValue, fValue, fValue); //3
-
-	AddQuad(point0, point1, point3, point2);
+	int s = a_nSubdivisions; //abbrev. for rest of code
+	float r = a_fRadius;
+	float scale = 1;
+	float increment = 2 * PI / s;
+	for (int i = 0; i < s; i++) {
+		for (int j = 0; j < s; j++) {
+			float angle1 = increment * i;
+			float angle2 = increment * j;
+			//2---3
+			//| \ |
+			//0---1
+			vector3 point0(r * sin(glm::radians(angle1)) * cos(glm::radians(angle2)), r * sin(glm::radians(angle1)) * sin(glm::radians(angle2)), r * cos(glm::radians(angle1)));
+			vector3 point1(r * sin(glm::radians(angle1)) * cos(glm::radians(angle2)), r * sin(glm::radians(angle1)) * sin(glm::radians(angle2)), r * cos(glm::radians(angle1)));
+			vector3 point2(r * sin(glm::radians(angle1)) * cos(glm::radians(angle2)), r * sin(glm::radians(angle1)) * sin(glm::radians(angle2)), r * cos(glm::radians(angle1)));
+			vector3 point3(r * sin(glm::radians(angle1)) * cos(glm::radians(angle2)), r * sin(glm::radians(angle1)) * sin(glm::radians(angle2)), r * cos(glm::radians(angle1)));
+			AddQuad(point0 * scale, point1 * scale, point2 * scale, point3 * scale);
+		}
+	}
 
 	//Your code ends here
 	CompileObject(a_v3Color);
